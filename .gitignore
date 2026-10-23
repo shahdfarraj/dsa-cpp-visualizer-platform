@@ -1,0 +1,16 @@
+# Executables
+*.exe
+*.out
+*.o
+*.obj
+
+# Generated trace files
+steps.json
+
+# Python environment & bytecode
+__pycache__/
+*.pyc
+
+# IDE Settings
+.vscode/
+.idea/
