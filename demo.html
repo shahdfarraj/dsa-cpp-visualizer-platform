@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSA Universal Visualizer - Full Operations Engine</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 20px; }
+        
+        .controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        select { padding: 9px 15px; border-radius: 6px; border: 1px solid #bdc3c7; font-size: 14px; font-weight: bold; color: #2c3e50; outline: none; cursor: pointer; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.2s; }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        
+        .visualizer-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
+        .tree-display { background-color: #ffffff; border: 2px solid #ecf0f1; border-radius: 8px; position: relative; height: 410px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; }
+        
+        .node { width: 44px; height: 44px; border-radius: 50%; background-color: #3498db; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); transition: all 0.4s ease; animation: popIn 0.3s ease-out; position: absolute; z-index: 2; }
+        .node.search { background-color: #f1c40f !important; color: #2c3e50; border: 2px solid #f39c12; scale: 1.1; }
+        .node.delete { background-color: #e74c3c !important; border: 2px solid #c0392b; }
+        .node.insert { background-color: #2ecc71; border: 2px solid #27ae60; }
+        .node.rotate { background-color: #9b59b6; border: 2px solid #8e44ad; }
+
+        /* Hash Bucket Layout */
+        .hash-grid { display: flex; flex-direction: column; gap: 10px; width: 80%; margin-top: 10px; }
+        .hash-row { display: flex; align-items: center; gap: 10px; background: #f8f9fa; border: 1px solid #e9ecef; padding: 6px 12px; border-radius: 6px; }
+        .hash-idx { font-weight: bold; color: #7f8c8d; min-width: 70px; }
+        .hash-chain { display: flex; gap: 8px; flex-wrap: wrap; }
+        .hash-item { background: #3498db; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 13px; animation: popIn 0.3s ease; }
+
+        .log-box { background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; height: 380px; overflow-y: auto; }
+        .log-entry { margin: 4px 0; padding: 4px 8px; border-bottom: 1px solid #34495e; font-size: 13px; }
+        .step-num { color: #f1c40f; font-weight: bold; }
+        .act-insert { color: #2ecc71; font-weight: bold; }
+        .act-search { color: #f1c40f; font-weight: bold; }
+        .act-delete { color: #e74c3c; font-weight: bold; }
+        .act-rotate { color: #9b59b6; font-weight: bold; }
+
+        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DSA Universal Visualizer</h1>
+    <p class="subtitle">Complete Operations Engine: Insert, Search, Delete & Rebalance Workflow</p>
+
+    <div class="controls">
+        <label for="dsSelect"><b>Select Structure:</b></label>
+        <select id="dsSelect" onchange="changeDS()">
+            <option value="avl">AVL Tree (Insert, Search, Delete, Rotation)</option>
+            <option value="bst">Binary Search Tree (Insert, Search, Delete)</option>
+            <option value="heap">Max Heap (Insert, Search, Delete Root/Extract-Max)</option>
+            <option value="hash">Hash Table (Insert Collision, Search, Delete Key)</option>
+            <option value="graph">Graph Network (Insert Nodes, Search/BFS, Remove Edge)</option>
+        </select>
+        <button id="startBtn" onclick="initDS()">Start Execution</button>
+        <button id="nextBtn" onclick="nextStep()" disabled>Next Step</button>
+        <button id="autoBtn" onclick="toggleAutoPlay()" disabled>Auto Play</button>
+    </div>
+
+    <div class="visualizer-layout">
+        <div class="tree-display" id="visualContainer"></div>
+        <div class="log-box" id="logBox">
+            <div class="log-entry">Select a Data Structure and click "Start Execution"...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const datasets = {
+        avl: [
+            { act: "INSERT", val: 30, type: "insert", pos: { top: 30, left: 50 } },
+            { act: "INSERT", val: 20, type: "insert", pos: { top: 110, left: 30 } },
+            { act: "INSERT", val: 40, type: "insert", pos: { top: 110, left: 70 } },
+            { act: "INSERT", val: 10, type: "insert", pos: { top: 190, left: 18 } },
+            { act: "SEARCH", val: 20, type: "search", msg: "Searching for Key 20 -> FOUND" },
+            { act: "DELETE", val: 10, type: "delete", msg: "Removing Leaf Node 10" },
+            { act: "REBALANCE", val: 30, type: "rotate", msg: "AVL Rotation Executed" }
+        ],
+        bst: [
+            { act: "INSERT", val: 50, type: "insert", pos: { top: 30, left: 50 } },
+            { act: "INSERT", val: 30, type: "insert", pos: { top: 110, left: 30 } },
+            { act: "INSERT", val: 70, type: "insert", pos: { top: 110, left: 70 } },
+            { act: "SEARCH", val: 70, type: "search", msg: "50 < 70 -> Right Child FOUND" },
+            { act: "DELETE", val: 30, type: "delete", msg: "Deleting Node 30" }
+        ],
+        heap: [
+            { act: "INSERT", val: 95, type: "insert", pos: { top: 30, left: 50 } },
+            { act: "INSERT", val: 75, type: "insert", pos: { top: 110, left: 30 } },
+            { act: "INSERT", val: 80, type: "insert", pos: { top: 110, left: 70 } },
+            { act: "SEARCH", val: 95, type: "search", msg: "Checking Max Priority Element (Root)" },
+            { act: "EXTRACT-MAX", val: 95, type: "delete", msg: "Removing Root (95) & Percolating Down" }
+        ],
+        hash: [
+            { act: "HASH INSERT", val: 15, type: "insert", bucket: 1 },
+            { act: "HASH INSERT", val: 25, type: "insert", bucket: 1, msg: "Collision! Chained at Bucket 1" },
+            { act: "HASH INSERT", val: 42, type: "insert", bucket: 2 },
+            { act: "HASH SEARCH", val: 25, type: "search", msg: "Traversing Chain at Bucket 1 -> FOUND" },
+            { act: "HASH DELETE", val: 15, type: "delete", bucket: 1, msg: "Key 15 Deleted from Hash Table" }
+        ],
+        graph: [
+            { act: "ADD NODE", val: "A", type: "insert", pos: { top: 40, left: 50 } },
+            { act: "ADD NODE", val: "B", type: "insert", pos: { top: 140, left: 30 } },
+            { act: "ADD NODE", val: "C", type: "insert", pos: { top: 140, left: 70 } },
+            { act: "BFS SEARCH", val: "B", type: "search", msg: "Traversing Edge A -> B" },
+            { act: "REMOVE EDGE", val: "C", type: "delete", msg: "Node C Disconnected from Graph" }
+        ]
+    };
+
+    let steps = [];
+    let currentStep = 0;
+    let autoInterval = null;
+    let activeElements = {};
+
+    function changeDS() {
+        if (autoInterval) clearInterval(autoInterval);
+        document.getElementById('autoBtn').innerText = 'Auto Play';
+        document.getElementById('visualContainer').innerHTML = '';
+        document.getElementById('logBox').innerHTML = '<div class="log-entry">Data Structure changed. Click "Start Execution".</div>';
+        document.getElementById('nextBtn').disabled = true;
+        document.getElementById('autoBtn').disabled = true;
+    }
+
+    function initDS() {
+        const selected = document.getElementById('dsSelect').value;
+        steps = datasets[selected];
+        currentStep = 0;
+        activeElements = {};
+        const container = document.getElementById('visualContainer');
+        container.innerHTML = '';
+
+        if (selected === 'hash') {
+            container.innerHTML = `
+                <div class="hash-grid">
+                    <div class="hash-row"> <span class="hash-idx">Bucket 0:</span> <div class="hash-chain" id="b-0"></div> </div>
+                    <div class="hash-row"> <span class="hash-idx">Bucket 1:</span> <div class="hash-chain" id="b-1"></div> </div>
+                    <div class="hash-row"> <span class="hash-idx">Bucket 2:</span> <div class="hash-chain" id="b-2"></div> </div>
+                </div>`;
+        }
+
+        document.getElementById('logBox').innerHTML = `<div class="log-entry" style="color:#3498db;">Initialized ${selected.toUpperCase()} Pipeline!</div>`;
+        document.getElementById('nextBtn').disabled = false;
+        document.getElementById('autoBtn').disabled = false;
+    }
+
+    function nextStep() {
+        if (currentStep < steps.length) {
+            const step = steps[currentStep];
+            const logBox = document.getElementById('logBox');
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            let actClass = "act-insert";
+            if (step.type === "search") actClass = "act-search";
+            if (step.type === "delete") actClass = "act-delete";
+            if (step.type === "rotate") actClass = "act-rotate";
+
+            const extra = step.msg ? ` (${step.msg})` : '';
+            entry.innerHTML = `<span class="step-num">[Step ${currentStep + 1}]</span> <span class="${actClass}">${step.act}</span>: <b>${step.val}</b>${extra}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+
+            // Execution logic
+            const selected = document.getElementById('dsSelect').value;
+            if (selected === 'hash') {
+                handleHashOperation(step);
+            } else {
+                handleNodeOperation(step);
+            }
+
+            currentStep++;
+        } else {
+            if (autoInterval) clearInterval(autoInterval);
+            alert('Full Operations Sequence Completed!');
+        }
+    }
+
+    function handleNodeOperation(step) {
+        resetNodeStyles();
+        if (step.type === "insert") {
+            const container = document.getElementById('visualContainer');
+            const node = document.createElement('div');
+            node.className = 'node insert';
+            node.id = `elem-${step.val}`;
+            node.innerText = step.val;
+            node.style.top = `${step.pos.top}px`;
+            node.style.left = `calc(${step.pos.left}% - 22px)`;
+            container.appendChild(node);
+            activeElements[step.val] = node;
+        } else if (step.type === "search") {
+            if (activeElements[step.val]) {
+                activeElements[step.val].classList.add('search');
+            }
+        } else if (step.type === "delete") {
+            if (activeElements[step.val]) {
+                activeElements[step.val].classList.add('delete');
+                setTimeout(() => {
+                    if (activeElements[step.val] && activeElements[step.val].parentNode) {
+                        activeElements[step.val].parentNode.removeChild(activeElements[step.val]);
+                        delete activeElements[step.val];
+                    }
+                }, 500);
+            }
+        } else if (step.type === "rotate") {
+            if (activeElements[step.val]) {
+                activeElements[step.val].classList.add('rotate');
+            }
+        }
+    }
+
+    function handleHashOperation(step) {
+        const bucket = document.getElementById(`b-${step.bucket}`);
+        if (!bucket) return;
+
+        if (step.type === "insert") {
+            const item = document.createElement('div');
+            item.className = 'hash-item';
+            item.id = `hash-val-${step.val}`;
+            item.innerText = step.val;
+            bucket.appendChild(item);
+        } else if (step.type === "search") {
+            const item = document.getElementById(`hash-val-${step.val}`);
+            if (item) {
+                item.style.background = '#f1c40f';
+                item.style.color = '#2c3e50';
+            }
+        } else if (step.type === "delete") {
+            const item = document.getElementById(`hash-val-${step.val}`);
+            if (item) {
+                item.style.background = '#e74c3c';
+                setTimeout(() => {
+                    if (item.parentNode) item.parentNode.removeChild(item);
+                }, 500);
+            }
+        }
+    }
+
+    function resetNodeStyles() {
+        Object.values(activeElements).forEach(node => {
+            node.className = 'node';
+        });
+    }
+
+    function toggleAutoPlay() {
+        const btn = document.getElementById('autoBtn');
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            btn.innerText = 'Auto Play';
+        } else {
+            btn.innerText = 'Pause';
+            autoInterval = setInterval(nextStep, 700);
+        }
+    }
+</script>
+</body>
+</html>
